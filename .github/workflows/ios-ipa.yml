@@ -39,9 +39,9 @@ jobs:
           flutter --version
           pod --version
           go version
-      # 上游仓库的 pubspec.lock 落后于 pubspec.yaml（video_player 等未写入锁文件），
-      # 而 scripts/build_ios.py 内部使用 `flutter pub get --enforce-lockfile` 会因此直接失败。
-      # 这里先在构建工作区把锁文件刷新到与 pubspec.yaml 一致，脚本内的 --enforce-lockfile 即可通过。
+      # 上游 pubspec.lock 落后于 pubspec.yaml（video_player 等未写入锁文件），
+      # 而 build_ios.py 内部使用 `flutter pub get --enforce-lockfile`，会因此直接失败。
+      # 先把锁文件刷新到与 pubspec.yaml 一致，脚本内的 --enforce-lockfile 即通过。
       - name: 同步 pubspec.lock
         run: |
           set -euo pipefail
@@ -50,6 +50,29 @@ jobs:
           flutter pub get --enforce-lockfile
       - name: Build unsigned IPA (${{ matrix.edition }})
         run: python3 scripts/build_ios.py ${{ matrix.arguments }}
+      # 上游脚本打包 IPA 时用的是 `ditto -c -k --sequesterRsrc <Payload> <ipa>`，
+      # 少了 --keepParent，导致压缩包根目录直接是 Runner.app 而不是 Payload/Runner.app，
+      # 生成的 .ipa 结构不合规，AltStore / Sideloadly 无法识别安装。
+      # 这里按 iOS 规范用 --keepParent 重新打包，并保留原文件权限。
+      - name: 修复 IPA 结构（补 Payload 层级）
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
+          slug=${{ matrix.edition }}
+          app="build/ios/iphoneos/Runner.app"
+          [ -d "$app" ] || { echo "找不到 $app"; exit 1; }
+          work="$RUNNER_TEMP/ipa-repack"
+          rm -rf "$work"; mkdir -p "$work/Payload"
+          cp -R "$app" "$work/Payload/Runner.app"
+          out="$PWD/dist/ios/${slug}-${version}-ios-unsigned.ipa"
+          mkdir -p "$(dirname "$out")"
+          rm -f "$out"
+          ( cd "$work" && ditto -c -k --sequesterRsrc --keepParent Payload "$out" )
+          ( cd "$PWD/dist/ios" && sha256sum *-ios-unsigned.ipa *-ios-unsigned-app.zip > SHA256SUMS.txt )
+          echo "--- 校验 IPA 结构 ---"
+          unzip -l "$out" | head -6
+          unzip -l "$out" | grep -q "Payload/Runner.app/Runner" || { echo "❌ IPA 结构仍然错误"; exit 1; }
+          echo "✅ Payload/Runner.app 层级正确"
       - name: List output
         run: ls -la dist/ios/
       - uses: actions/upload-artifact@v4
@@ -84,7 +107,7 @@ jobs:
             zip=$(find release -maxdepth 1 -name "${e}-*-ios-unsigned-app.zip" | head -n1)
             [ -n "$zip" ] && cp "$zip" "release/${e}-ios-unsigned-app.zip"
           done
-          (cd release && sha256sum *.ipa *.zip > SHA256SUMS.txt)
+          ( cd release && sha256sum *.ipa *.zip > SHA256SUMS.txt )
           ls -la release/
       - name: 发布 Release（滚动标签 ios-latest，链接永久有效）
         env:
