@@ -43,6 +43,15 @@ jobs:
           flutter --version
           pod --version
           go version
+      # 上游仓库的 pubspec.lock 落后于 pubspec.yaml（video_player 等未写入锁文件），
+      # 而 scripts/build_ios.py 内部使用 `flutter pub get --enforce-lockfile` 会因此直接失败。
+      # 这里先在构建工作区把锁文件刷新到与 pubspec.yaml 一致，脚本内的 --enforce-lockfile 即可通过。
+      - name: 同步 pubspec.lock
+        run: |
+          set -euo pipefail
+          flutter pub get
+          echo "--- 校验：再次以 --enforce-lockfile 方式解析 ---"
+          flutter pub get --enforce-lockfile
       - name: Build unsigned IPA (${{ matrix.edition }})
         run: python3 scripts/build_ios.py ${{ matrix.arguments }}
       - name: List output
