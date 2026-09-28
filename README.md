@@ -2,6 +2,23 @@
 
 > ⚠️ **免责声明**：本项目源码来自网上大名鼎鼎的**鱼佬**（原作者）。我只是把它拿来打包、测试着玩，方便自己用，**不保证任何可用性，随时可能删库**。
 
+## 📥 下载安装包
+
+| 平台 | 版本 | 站源 | 直接下载 |
+| --- | --- | --- | --- |
+| **iOS**（未签名 IPA） | 真果鉴 | 全部站源 | [⬇️ zhenguojian-ios-unsigned.ipa](https://github.com/jiojiotong/guoapp/releases/download/ios-latest/zhenguojian-ios-unsigned.ipa) |
+| **iOS**（未签名 IPA） | 红果鉴 | 仅红果源 | [⬇️ hongguojian-ios-unsigned.ipa](https://github.com/jiojiotong/guoapp/releases/download/ios-latest/hongguojian-ios-unsigned.ipa) |
+| **iOS**（Runner.app 压缩包，自行签名用） | 真果鉴 / 红果鉴 | 全部 / 仅红果 | [⬇️ 见 Release 附件](https://github.com/jiojiotong/guoapp/releases/tag/ios-latest) |
+| **Android**（APK，多架构） | 真果鉴 / 红果鉴 | 全部 / 仅红果 | [📦 前往 Release 下载](https://github.com/jiojiotong/guoapp/releases) |
+
+> ⚠️ iOS 包是**未签名 IPA**，需要用 **AltStore / Sideloadly / TrollStore** 之类工具自签后才能装到 iPhone 上（没有 Apple 开发者证书就没法直接安装）。
+>
+> 🔗 上表使用滚动标签 `ios-latest`，**每次构建自动覆盖更新，链接永久有效**，无需再找新地址。
+>
+> 🛠️ 本仓库 = 上游 `jerunshi/guoapp1` 的镜像，额外新增了 iOS 打包流程（`.github/workflows/ios-ipa.yml`：macOS runner + Flutter 3.47.4 + Go 交叉编译 iOS 静态库），并在构建前修复了上游 `pubspec.lock` 与 `pubspec.yaml` 不同步导致的 `--enforce-lockfile` 失败。
+
+---
+
 Flutter 多端独立短剧 / 影视应用，原名「短剧库 APP」。站源请求、解析、下载和播放均在设备上完成，不依赖自建服务。当前源码版本：**0.2.51+57**。
 
 本轮在 0.2.50 基线上新增两个原生站源：**韩小圈**（`hanxiaoquan`，韩剧 / 韩国电影 / 韩国综艺 / 韩国动漫）与**鬼片网**（`guipian`，鬼片 / 电视剧 / 动漫）。默认可见站源顺序为：**红果 → 韩小圈 → 鬼片 → 青空**。

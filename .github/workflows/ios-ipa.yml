@@ -2,10 +2,6 @@ name: Build unsigned iOS IPA
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/ios-ipa.yml'
 
 permissions:
   contents: read
@@ -62,3 +58,60 @@ jobs:
           path: dist/ios/*
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    needs: ios
+    if: always() && needs.ios.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: 整理安装包（生成固定文件名，便于主页长期直链下载）
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          mkdir -p release
+          find artifacts -type f \( -name '*.ipa' -o -name '*-ios-unsigned-app.zip' \) -exec cp -v {} release/ \;
+          for e in hongguojian zhenguojian; do
+            ipa=$(find release -maxdepth 1 -name "${e}-*-ios-unsigned.ipa" | head -n1)
+            [ -n "$ipa" ] && cp "$ipa" "release/${e}-ios-unsigned.ipa"
+            zip=$(find release -maxdepth 1 -name "${e}-*-ios-unsigned-app.zip" | head -n1)
+            [ -n "$zip" ] && cp "$zip" "release/${e}-ios-unsigned-app.zip"
+          done
+          (cd release && sha256sum *.ipa *.zip > SHA256SUMS.txt)
+          ls -la release/
+      - name: 发布 Release（滚动标签 ios-latest，链接永久有效）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=ios-latest
+          REPO=${{ github.repository }}
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          {
+            printf '%s\n\n' "## 📱 iOS 未签名 IPA"
+            printf '%s\n\n' "构建版本：**${APP_VERSION}**（源码提交 \`${GITHUB_SHA:0:7}\`）"
+            printf '%s\n\n' "两个版本功能相同，区别只在站源范围。**均为未签名 IPA**，需用 AltStore / Sideloadly / TrollStore 等工具自签后才能安装到 iPhone。"
+            printf '%s\n' "| 版本 | 站源 | 直接下载 |"
+            printf '%s\n' "| --- | --- | --- |"
+            printf '%s\n' "| 真果鉴 | 全部站源 | [zhenguojian-ios-unsigned.ipa](${BASE}/zhenguojian-ios-unsigned.ipa) |"
+            printf '%s\n' "| 红果鉴 | 仅红果源 | [hongguojian-ios-unsigned.ipa](${BASE}/hongguojian-ios-unsigned.ipa) |"
+            printf '\n%s\n\n' "未签名 Runner.app 压缩包（自行签名 / 打包用）：[zhenguojian-ios-unsigned-app.zip](${BASE}/zhenguojian-ios-unsigned-app.zip) · [hongguojian-ios-unsigned-app.zip](${BASE}/hongguojian-ios-unsigned-app.zip)"
+            printf '%s\n\n' "### 校验和（SHA256）"
+            printf '```\n'
+            cat release/SHA256SUMS.txt
+            printf '```\n'
+          } > notes.md
+
+          # 滚动标签：每次构建重建，保证上面的固定链接永远指向最新包
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" release/* \
+            --title "iOS 未签名 IPA（最新版 · ${APP_VERSION}）" \
+            --notes-file notes.md
+          gh release view "$TAG" --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"' || true
