@@ -100,12 +100,12 @@ jobs:
           version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
           mkdir -p release
-          find artifacts -type f \( -name '*.ipa' -o -name '*-ios-unsigned-app.zip' \) -exec cp -v {} release/ \;
           for e in hongguojian zhenguojian; do
-            ipa=$(find release -maxdepth 1 -name "${e}-*-ios-unsigned.ipa" | head -n1)
-            [ -n "$ipa" ] && cp "$ipa" "release/${e}-ios-unsigned.ipa"
-            zip=$(find release -maxdepth 1 -name "${e}-*-ios-unsigned-app.zip" | head -n1)
-            [ -n "$zip" ] && cp "$zip" "release/${e}-ios-unsigned-app.zip"
+            ipa=$(find artifacts -type f -name "${e}-*-ios-unsigned.ipa" | head -n1)
+            [ -n "$ipa" ] || { echo "缺少 ${e} 的 IPA 产物"; exit 1; }
+            cp -v "$ipa" "release/${e}-ios-unsigned.ipa"
+            zip=$(find artifacts -type f -name "${e}-*-ios-unsigned-app.zip" | head -n1)
+            [ -n "$zip" ] && cp -v "$zip" "release/${e}-ios-unsigned-app.zip"
           done
           ( cd release && sha256sum *.ipa *.zip > SHA256SUMS.txt )
           ls -la release/
