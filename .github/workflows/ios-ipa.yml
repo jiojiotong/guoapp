@@ -68,9 +68,10 @@ jobs:
           mkdir -p "$(dirname "$out")"
           rm -f "$out"
           ( cd "$work" && ditto -c -k --sequesterRsrc --keepParent Payload "$out" )
-          ( cd "$PWD/dist/ios" && sha256sum *-ios-unsigned.ipa *-ios-unsigned-app.zip > SHA256SUMS.txt )
+          # macOS 没有 GNU 的 sha256sum，只有 shasum
+          ( cd "$PWD/dist/ios" && if command -v sha256sum >/dev/null 2>&1; then sha256sum *-ios-unsigned.ipa *-ios-unsigned-app.zip > SHA256SUMS.txt; else shasum -a 256 *-ios-unsigned.ipa *-ios-unsigned-app.zip > SHA256SUMS.txt; fi )
           echo "--- 校验 IPA 结构 ---"
-          unzip -l "$out" | head -6
+          unzip -l "$out" | sed -n '1,6p'
           unzip -l "$out" | grep -q "Payload/Runner.app/Runner" || { echo "❌ IPA 结构仍然错误"; exit 1; }
           echo "✅ Payload/Runner.app 层级正确"
       - name: List output
